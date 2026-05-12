@@ -23,9 +23,9 @@ export default function Analytics() {
         api.get('/ml/predictions')
       ]);
 
-      const students = studentsRes.data;
-      const analyses = analysesRes.data;
-      const predictions = predictionsRes.data;
+      const students = studentsRes;
+      const analyses = analysesRes;
+      const predictions = predictionsRes;
 
       // Domain distribution
       const domainCounts = {};

@@ -14,7 +14,7 @@ export default function StudentLearningRoadmap({ user }) {
     setLoading(true);
     try {
       const response = await api.get(`/learning-roadmap/${user.id}`);
-      setRoadmap(response.data.weeks || []);
+      setRoadmap(response.weeks || []);
     } catch (error) {
       console.error('Error fetching learning roadmap:', error);
     } finally {

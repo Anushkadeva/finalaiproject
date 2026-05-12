@@ -14,7 +14,7 @@ export default function StudentProgressTracking({ user }) {
     setLoading(true);
     try {
       const response = await api.get(`/progress/${user.id}`);
-      setProgressData(response.data.progress_data || []);
+      setProgressData(response.progress_data || []);
     } catch (error) {
       console.error('Error fetching progress data:', error);
     } finally {

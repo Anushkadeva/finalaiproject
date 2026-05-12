@@ -18,7 +18,7 @@ export default function SkillGapAnalysis() {
   const fetchStudents = async () => {
     try {
       const response = await api.get('/students');
-      setStudents(response.data);
+      setStudents(response);
     } catch (error) {
       console.error('Error fetching students:', error);
     }
@@ -34,7 +34,7 @@ export default function SkillGapAnalysis() {
         : `/analysis/skill-gaps/${selectedStudent}`;
       
       const response = await api.get(url);
-      setGapAnalysis(response.data);
+      setGapAnalysis(response);
     } catch (error) {
       console.error('Error fetching gap analysis:', error);
     } finally {

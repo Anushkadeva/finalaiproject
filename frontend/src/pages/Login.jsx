@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { api } from '../services/api';
 
 // Demo admin credentials — replace with real auth in production
 const ADMIN_EMAIL = 'admin@placeai.com';
@@ -12,7 +13,7 @@ export default function Login({ onLogin }) {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -20,27 +21,22 @@ export default function Login({ onLogin }) {
     if (!/\S+@\S+\.\S+/.test(form.email)) { setError('Enter a valid email address.'); return; }
     if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
 
-    if (tab === 'signup') {
-      if (!form.name) { setError('Please enter your full name.'); return; }
-      if (form.password !== form.confirm) { setError('Passwords do not match.'); return; }
-      // Sign up always creates a student account
-      onLogin({ name: form.name, email: form.email, role: 'student' });
-      return;
-    }
+    try {
+      if (tab === 'signup') {
+        if (!form.name) { setError('Please enter your full name.'); return; }
+        if (form.password !== form.confirm) { setError('Passwords do not match.'); return; }
+        
+        const user = await api.signup({ name: form.name, email: form.email, password: form.password });
+        onLogin(user);
+        return;
+      }
 
-    // Sign in — check admin credentials
-    if (form.email === ADMIN_EMAIL && form.password === ADMIN_PASS) {
-      onLogin({ name: 'Admin', email: form.email, role: 'admin' });
-      return;
+      // Sign in
+      const user = await api.login({ email: form.email, password: form.password, role });
+      onLogin(user);
+    } catch (e) {
+      setError(e.message || 'Authentication failed');
     }
-
-    // Regular student sign in
-    if (role === 'admin') {
-      setError('Invalid admin credentials.');
-      return;
-    }
-
-    onLogin({ name: form.email.split('@')[0], email: form.email, role: 'student' });
   };
 
   return (

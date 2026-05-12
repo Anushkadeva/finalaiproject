@@ -13,7 +13,7 @@ export default function StudentJobRecommendations({ user }) {
     setLoading(true);
     try {
       const response = await api.get(`/job-recommendations/${user.id}`);
-      setRecommendations(response.data.recommendations || []);
+      setRecommendations(response.recommendations || []);
     } catch (error) {
       console.error('Error fetching job recommendations:', error);
     } finally {

@@ -15,7 +15,7 @@ export default function ProgressTracking() {
   const fetchStudents = async () => {
     try {
       const response = await api.get('/students');
-      setStudents(response.data);
+      setStudents(response);
     } catch (error) {
       console.error('Error fetching students:', error);
     }
@@ -25,7 +25,7 @@ export default function ProgressTracking() {
     setLoading(true);
     try {
       const response = await api.get(`/progress/${studentId}`);
-      setProgressData(response.data);
+      setProgressData(response);
     } catch (error) {
       console.error('Error fetching progress data:', error);
     } finally {

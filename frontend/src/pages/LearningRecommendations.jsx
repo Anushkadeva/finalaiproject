@@ -16,7 +16,7 @@ export default function LearningRecommendations() {
   const fetchStudents = async () => {
     try {
       const response = await api.get('/students');
-      setStudents(response.data);
+      setStudents(response);
     } catch (error) {
       console.error('Error fetching students:', error);
     }
@@ -26,7 +26,7 @@ export default function LearningRecommendations() {
     setLoading(true);
     try {
       const response = await api.get(`/learning/recommendations/${studentId}`);
-      setRecommendations(response.data);
+      setRecommendations(response);
     } catch (error) {
       console.error('Error fetching recommendations:', error);
     } finally {

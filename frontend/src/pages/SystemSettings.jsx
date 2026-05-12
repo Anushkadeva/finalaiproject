@@ -24,8 +24,8 @@ export default function SystemSettings() {
   const fetchSettings = async () => {
     try {
       const response = await api.get('/settings');
-      if (response.data) {
-        setSettings(response.data);
+      if (response) {
+        setSettings(response);
       }
     } catch (error) {
       console.error('Error fetching settings:', error);

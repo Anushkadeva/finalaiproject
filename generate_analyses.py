@@ -13,11 +13,11 @@ for i, student in enumerate(students):
         # Run traditional analysis
         analysis_response = requests.post(f'http://127.0.0.1:5000/api/analyze/{student["id"]}')
         if analysis_response.status_code == 201:
-            print(f"✓ Analysis {i+1}/{len(students)}: {student['name']}")
+            print(f"[OK] Analysis {i+1}/{len(students)}: {student['name']}")
         else:
-            print(f"✗ Analysis failed for {student['name']}: {analysis_response.status_code}")
+            print(f"[ERROR] Analysis failed for {student['name']}: {analysis_response.status_code}")
     except Exception as e:
-        print(f"✗ Error analyzing {student['name']}: {e}")
+        print(f"[ERROR] Error analyzing {student['name']}: {e}")
 
 print("All analyses completed!")
 

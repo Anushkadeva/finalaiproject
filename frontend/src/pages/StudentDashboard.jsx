@@ -7,9 +7,7 @@ export default function StudentDashboard({ user }) {
     readinessScore: 0,
     bestDomain: '',
     topSkills: [],
-    recentAnalyses: [],
-    recommendations: [],
-    progress: null
+    recentAnalyses: []
   });
 
   useEffect(() => {
@@ -18,23 +16,17 @@ export default function StudentDashboard({ user }) {
 
   const fetchDashboardData = async () => {
     try {
-      const [analysisRes, recommendationsRes, progressRes] = await Promise.all([
-        api.get(`/analysis/student/${user.id}`),
-        api.get(`/learning/recommendations/${user.id}`),
-        api.get(`/progress/${user.id}`)
+      const [analysisRes] = await Promise.all([
+        api.get(`/analysis/student/${user.id}`)
       ]);
 
-      const analysis = analysisRes.data;
-      const recommendations = recommendationsRes.data;
-      const progress = progressRes.data;
+      const analysis = analysisRes;
 
       setDashboardData({
         readinessScore: analysis?.readiness_pct || 0,
         bestDomain: analysis?.best_domain || 'Not analyzed',
         topSkills: analysis?.top_skills || [],
-        recentAnalyses: analysis ? [analysis] : [],
-        recommendations: recommendations?.recommendations || [],
-        progress: progress
+        recentAnalyses: analysis ? [analysis] : []
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -141,100 +133,7 @@ export default function StudentDashboard({ user }) {
           </div>
         </div>
 
-        <div className="recommendations-card">
-          <div className="card-header">
-            <h2>Learning Recommendations</h2>
-            <div className="card-icon">📚</div>
-          </div>
-          <div className="recommendations-list">
-            {dashboardData.recommendations.length > 0 ? (
-              dashboardData.recommendations.slice(0, 3).map((rec, index) => (
-                <div key={index} className="recommendation-item">
-                  <div className="rec-type">
-                    {rec.recommendation_type === 'course' && '📖'}
-                    {rec.recommendation_type === 'video' && '🎥'}
-                    {rec.recommendation_type === 'platform' && '🏗️'}
-                    {rec.recommendation_type === 'project' && '💼'}
-                  </div>
-                  <div className="rec-content">
-                    <div className="rec-title">{rec.skill_name}</div>
-                    <div className="rec-details">
-                      <span className="rec-priority">{rec.priority}</span>
-                      <span className="rec-time">{rec.estimated_time}</span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="no-data">
-                <p>No recommendations available</p>
-                <button 
-                  className="btn btn-primary"
-                  onClick={() => alert('Navigate to Learning Resources')}
-                >
-                  Get Recommendations
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
 
-        <div className="progress-card">
-          <div className="card-header">
-            <h2>Progress Tracking</h2>
-            <div className="card-icon">📈</div>
-          </div>
-          {dashboardData.progress ? (
-            <div className="progress-summary">
-              <div className="progress-metrics">
-                <div className="metric">
-                  <span className="metric-label">Current Score:</span>
-                  <span className="metric-value">
-                    {dashboardData.progress.progress_data?.length > 0 
-                      ? dashboardData.progress.progress_data[dashboardData.progress.progress_data.length - 1].readiness_score.toFixed(1)
-                      : 'N/A'
-                    }%
-                  </span>
-                </div>
-                <div className="metric">
-                  <span className="metric-label">Trend:</span>
-                  <span 
-                    className="metric-value"
-                    style={{ 
-                      color: dashboardData.progress.trend_analysis?.trend === 'improving' ? '#10b981' : 
-                             dashboardData.progress.trend_analysis?.trend === 'declining' ? '#ef4444' : '#6b7280'
-                    }}
-                  >
-                    {dashboardData.progress.trend_analysis?.trend || 'N/A'}
-                  </span>
-                </div>
-                <div className="metric">
-                  <span className="metric-label">Improvement:</span>
-                  <span 
-                    className="metric-value"
-                    style={{ 
-                      color: dashboardData.progress.trend_analysis?.improvement > 0 ? '#10b981' : '#ef4444'
-                    }}
-                  >
-                    {dashboardData.progress.trend_analysis?.improvement > 0 ? '+' : ''}
-                    {dashboardData.progress.trend_analysis?.improvement?.toFixed(1) || '0'}%
-                  </span>
-                </div>
-              </div>
-              <button 
-                className="btn btn-outline"
-                onClick={() => alert('Navigate to Progress Tracking')}
-              >
-                View Full Progress
-              </button>
-            </div>
-          ) : (
-            <div className="no-data">
-              <p>No progress data available</p>
-              <p>Complete multiple analyses to track your progress</p>
-            </div>
-          )}
-        </div>
       </div>
 
       <div className="quick-actions">
@@ -262,16 +161,6 @@ export default function StudentDashboard({ user }) {
             </div>
           </button>
 
-          <button 
-            className="action-card"
-            onClick={() => alert('Navigate to Learning Resources')}
-          >
-            <div className="action-icon">📚</div>
-            <div className="action-content">
-              <h3>Learning Resources</h3>
-              <p>Access personalized recommendations</p>
-            </div>
-          </button>
 
           <button 
             className="action-card"

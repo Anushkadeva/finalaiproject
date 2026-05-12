@@ -24,7 +24,7 @@ export default function StudentLearningResources({ user }) {
       );
 
       setResources(
-        response.data?.recommendations || []
+        response.recommendations || []
       );
     } catch (error) {
       console.error(

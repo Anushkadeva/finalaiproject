@@ -2,10 +2,14 @@
 const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 async function request(path, options = {}) {
+  const isFormData = options.body instanceof FormData;
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    headers: { 
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...options.headers 
+    },
+    body: options.body ? (isFormData ? options.body : JSON.stringify(options.body)) : undefined,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }));
@@ -15,6 +19,10 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  // Auth
+  login: (credentials) => request('/auth/login', { method: 'POST', body: credentials }),
+  signup: (data) => request('/auth/signup', { method: 'POST', body: data }),
+
   // Students
   getStudents: () => request('/students'),
   getStudent: (id) => request(`/students/${id}`),
@@ -30,4 +38,10 @@ export const api = {
   // Dashboard
   getDashboardStats: () => request('/dashboard/stats'),
   getRoles: () => request('/roles'),
+
+  // Generic methods
+  get: (path) => request(path),
+  post: (path, data, options = {}) => request(path, { method: 'POST', body: data, ...options }),
+  put: (path, data) => request(path, { method: 'PUT', body: data }),
+  delete: (path) => request(path, { method: 'DELETE' }),
 };

@@ -2,21 +2,23 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 
-export default function ResumeAnalyzer() {
+export default function ResumeAnalyzer({ user }) {
   const [students, setStudents] = useState([]);
-  const [selectedStudent, setSelectedStudent] = useState('');
+  const [selectedStudent, setSelectedStudent] = useState(user?.id || '');
   const [uploading, setUploading] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
-    fetchStudents();
-  }, []);
+    if (!user) {
+      fetchStudents();
+    }
+  }, [user]);
 
   const fetchStudents = async () => {
     try {
-      const response = await api.get('/students');
-      setStudents(response.data);
+      const response = await api.getStudents();
+      setStudents(response);
     } catch (error) {
       console.error('Error fetching students:', error);
     }
@@ -24,7 +26,12 @@ export default function ResumeAnalyzer() {
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
-    if (!file || !selectedStudent) return;
+    const studentId = user?.id || selectedStudent;
+    
+    if (!file || !studentId) {
+      alert('Please select a student and a file');
+      return;
+    }
 
     if (!file.name.endsWith('.pdf')) {
       alert('Please upload a PDF file');
@@ -36,26 +43,16 @@ export default function ResumeAnalyzer() {
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('student_id', selectedStudent);
+    formData.append('student_id', studentId);
 
     try {
-      const response = await api.post('/resume/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        onUploadProgress: (progressEvent) => {
-          const progress = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          setUploadProgress(progress);
-        },
-      });
-
-      setAnalysis(response.data);
+      const response = await api.post('/resume/upload', formData);
+      setAnalysis(response);
       setUploading(false);
       setUploadProgress(0);
     } catch (error) {
       console.error('Error uploading resume:', error);
+      alert(error.message || 'Upload failed');
       setUploading(false);
       setUploadProgress(0);
     }
@@ -85,21 +82,23 @@ export default function ResumeAnalyzer() {
       <div className="content-card">
         <div className="upload-section">
           <div className="form-row">
-            <div className="form-group">
-              <label>Select Student:</label>
-              <select 
-                value={selectedStudent} 
-                onChange={(e) => setSelectedStudent(e.target.value)}
-                className="form-select"
-              >
-                <option value="">Choose a student...</option>
-                {students.map(student => (
-                  <option key={student.id} value={student.id}>
-                    {student.name} - {student.interested_domain}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {!user && (
+              <div className="form-group">
+                <label>Select Student:</label>
+                <select 
+                  value={selectedStudent} 
+                  onChange={(e) => setSelectedStudent(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="">Choose a student...</option>
+                  {students.map(student => (
+                    <option key={student.id} value={student.id}>
+                      {student.name} - {student.interested_domain}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="form-group">
               <label>Upload Resume (PDF):</label>

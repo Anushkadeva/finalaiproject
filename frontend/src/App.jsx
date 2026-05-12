@@ -9,8 +9,6 @@ import SkillGapAnalysis from './pages/SkillGapAnalysis';
 import LearningRoadmap from './pages/LearningRoadmap';
 import ResumeAnalyzer from './pages/ResumeAnalyzer';
 import AIInsights from './pages/AIInsights';
-import ProgressTracking from './pages/ProgressTracking';
-import LearningRecommendations from './pages/LearningRecommendations';
 import AdminDashboard from './pages/AdminDashboard';
 import Analytics from './pages/Analytics';
 import PlacementReports from './pages/PlacementReports';
@@ -24,8 +22,6 @@ import StudentJobRecommendations from './pages/StudentJobRecommendations';
 import StudentSkillAnalysis from './pages/StudentSkillAnalysis';
 import StudentLearningRoadmap from './pages/StudentLearningRoadmap';
 import StudentAIInsights from './pages/StudentAIInsights';
-import StudentProgressTracking from './pages/StudentProgressTracking';
-import StudentLearningResources from './pages/StudentLearningResources';
 import './App.css';
 
 const ADMIN_NAV = [
@@ -43,13 +39,7 @@ const ADMIN_NAV = [
 const STUDENT_NAV = [
   { id: 'student_dashboard', label: 'Dashboard', icon: '🏠' },
   { id: 'placement_analyzer', label: 'Placement Analyzer', icon: '📊' },
-  { id: 'job_recommendations', label: 'Job Recommendations', icon: '�' },
-  { id: 'skill_analysis', label: 'Skill Analysis', icon: '🔍' },
-  { id: 'resume_analyzer', label: 'Resume Analyzer', icon: '�' },
-  { id: 'learning_roadmap', label: 'Learning Roadmap', icon: '🗺️' },
-  { id: 'ai_insights', label: 'AI Insights', icon: '🤖' },
-  { id: 'progress_tracking', label: 'Progress Tracking', icon: '📈' },
-  { id: 'learning_resources', label: 'Learning Resources', icon: '📚' },
+  { id: 'resume_analyzer', label: 'Resume Analyzer', icon: '📄' },
   { id: 'profile', label: 'Profile', icon: '👤' },
 ];
 
@@ -103,10 +93,10 @@ export default function App() {
 
       <main className="main-content">
         {/* Admin pages */}
-        {isAdmin && page === 'admin_dashboard' && <AdminDashboard />}
+        {isAdmin && page === 'admin_dashboard' && <AdminDashboard onNavigate={setPage} />}
         {isAdmin && page === 'students' && <Students />}
         {isAdmin && page === 'analytics' && <Analytics />}
-        {isAdmin && page === 'placement_reports' && <PlacementReports />}
+        {isAdmin && page === 'placement_reports' && <PlacementReports onNavigate={setPage} />}
         {isAdmin && page === 'skill_gap_analytics' && <AdminSkillGapAnalytics />}
         {isAdmin && page === 'domain_statistics' && <DomainStatistics />}
         {isAdmin && page === 'export_reports' && <ExportReports />}
@@ -116,13 +106,7 @@ export default function App() {
         {/* Student pages */}
         {!isAdmin && page === 'student_dashboard' && <StudentDashboard user={user} />}
         {!isAdmin && page === 'placement_analyzer' && <Analyzer user={user} />}
-        {!isAdmin && page === 'job_recommendations' && <StudentJobRecommendations user={user} />}
-        {!isAdmin && page === 'skill_analysis' && <StudentSkillAnalysis user={user} />}
-        {!isAdmin && page === 'resume_analyzer' && <ResumeAnalyzer />}
-        {!isAdmin && page === 'learning_roadmap' && <StudentLearningRoadmap user={user} />}
-        {!isAdmin && page === 'ai_insights' && <StudentAIInsights user={user} />}
-        {!isAdmin && page === 'progress_tracking' && <StudentProgressTracking user={user} />}
-        {!isAdmin && page === 'learning_resources' && <StudentLearningResources user={user} />}
+        {!isAdmin && page === 'resume_analyzer' && <ResumeAnalyzer user={user} />}
         {!isAdmin && page === 'profile' && <StudentProfile user={user} />}
       </main>
     </div>

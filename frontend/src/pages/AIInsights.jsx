@@ -15,7 +15,7 @@ export default function AIInsights() {
   const fetchStudents = async () => {
     try {
       const response = await api.get('/students');
-      setStudents(response.data);
+      setStudents(response);
     } catch (error) {
       console.error('Error fetching students:', error);
     }
@@ -25,7 +25,7 @@ export default function AIInsights() {
     setLoading(true);
     try {
       const response = await api.get(`/insights/${studentId}`);
-      setInsights(response.data);
+      setInsights(response);
     } catch (error) {
       console.error('Error fetching insights:', error);
     } finally {

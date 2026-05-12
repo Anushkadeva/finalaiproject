@@ -13,7 +13,7 @@ export default function StudentAIInsights({ user }) {
     setLoading(true);
     try {
       const response = await api.get(`/ai-insights/${user.id}`);
-      setInsights(response.data.insights || []);
+      setInsights(response.insights || []);
     } catch (error) {
       console.error('Error fetching AI insights:', error);
     } finally {

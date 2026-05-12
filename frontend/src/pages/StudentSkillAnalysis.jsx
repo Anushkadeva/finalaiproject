@@ -15,7 +15,7 @@ export default function StudentSkillAnalysis({ user }) {
     setLoading(true);
     try {
       const response = await api.get(`/skill-gap-analysis/${user.id}`);
-      setAnalysis(response.data);
+      setAnalysis(response);
     } catch (error) {
       console.error('Error fetching skill analysis:', error);
     } finally {
