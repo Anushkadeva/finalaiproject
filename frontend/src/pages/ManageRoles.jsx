@@ -14,7 +14,8 @@ export default function ManageRoles() {
   const fetchUsers = async () => {
     try {
       const response = await api.get('/users');
-      setUsers(response);
+      const sorted = [...response].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      setUsers(sorted);
     } catch (error) {
       console.error('Error fetching users:', error);
     }

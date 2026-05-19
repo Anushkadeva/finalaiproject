@@ -12,13 +12,16 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
-from ai_insights import generate_ai_insights, calculate_career_suitability
-from learning_recommendations import generate_learning_recommendations, get_learning_path
-from resume_analyzer import (
-    extract_text_from_pdf, extract_skills, calculate_resume_score,
-    generate_improvement_suggestions, analyze_resume_sentiment,
-    extract_missing_keywords, extract_strength_keywords
-)
+# Optional imports — gracefully disabled if packages not installed
+try:
+    from resume_analyzer import (
+        extract_text_from_pdf, extract_skills, calculate_resume_score,
+        generate_improvement_suggestions, analyze_resume_sentiment,
+        extract_missing_keywords, extract_strength_keywords
+    )
+    RESUME_ENABLED = True
+except ImportError:
+    RESUME_ENABLED = False
 
 app = Flask(__name__)
 CORS(app)
@@ -1545,55 +1548,35 @@ def signup():
 
 @app.route('/api/resume/upload', methods=['POST'])
 def upload_resume():
-    """Upload and analyze a resume PDF"""
+    if not RESUME_ENABLED:
+        return jsonify({'error': 'Resume analysis not available. Install PyPDF2 and textblob.'}), 503
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
-    
     file = request.files['file']
     student_id = request.form.get('student_id')
-    
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
-    
     if file and file.filename.endswith('.pdf'):
         try:
-            # Create uploads directory if not exists
             if not os.path.exists(app.config['UPLOAD_FOLDER']):
                 os.makedirs(app.config['UPLOAD_FOLDER'])
-                
-            # Save file temporarily
             temp_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
             file.save(temp_path)
-            
-            # Extract text
             text = extract_text_from_pdf(temp_path)
             skills = extract_skills(text)
-            
-            # Get student info for context
             student = Student.query.get(student_id)
-            domain = student.interested_domain if student else "IT / Software"
-            
+            domain = student.interested_domain if student else 'IT / Software'
             scores = calculate_resume_score(text, skills, domain)
             suggestions = generate_improvement_suggestions(text, skills, scores)
             sentiment = analyze_resume_sentiment(text)
             missing = extract_missing_keywords(text, domain)
             strengths = extract_strength_keywords(text, skills)
-            
-            # Clean up
             os.remove(temp_path)
-            
-            return jsonify({
-                'scores': scores,
-                'extracted_skills': skills,
-                'suggestions': suggestions,
-                'sentiment': sentiment,
-                'missing_keywords': missing,
-                'strength_keywords': strengths
-            })
+            return jsonify({'scores': scores, 'extracted_skills': skills, 'suggestions': suggestions,
+                            'sentiment': sentiment, 'missing_keywords': missing, 'strength_keywords': strengths})
         except Exception as e:
             if os.path.exists(temp_path): os.remove(temp_path)
             return jsonify({'error': str(e)}), 500
-    
     return jsonify({'error': 'Invalid file format'}), 400
 
 

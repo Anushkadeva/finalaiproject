@@ -69,20 +69,24 @@ export default function Login({ onLogin }) {
           <div className="blob blob1" /><div className="blob blob2" /><div className="blob blob3" />
         </div>
 
-        <div className="login-illustration">
-          <div className="illus-card">
-            <span className="illus-icon">◉</span>
-            <div><div className="illus-title">Placement Ready</div><div className="illus-val" style={{ color: 'var(--success)' }}>41%</div></div>
-          </div>
-          <div className="illus-card">
-            <span className="illus-icon" style={{ color: 'var(--orange)' }}>◈</span>
-            <div><div className="illus-title">Top Domain</div><div className="illus-val" style={{ color: 'var(--orange)' }}>IT / Software</div></div>
-          </div>
-          <div className="illus-card">
-            <span className="illus-icon" style={{ color: 'var(--purple)' }}>⊞</span>
-            <div><div className="illus-title">Avg Tech Score</div><div className="illus-val" style={{ color: 'var(--purple)' }}>1.8 / 5</div></div>
-          </div>
+        {/* Feature cards */}
+        <div className="login-features">
+          {[
+            { icon: '🎯', title: 'AI Job Matching',       desc: 'Get matched to roles with % compatibility' },
+            { icon: '📊', title: 'Skill Gap Analysis',    desc: 'See exactly what skills you need to build' },
+            { icon: '🗺️', title: 'Learning Roadmap',      desc: 'Week-by-week personalized study plan' },
+            { icon: '🤖', title: 'ML Readiness Score',    desc: 'Predicted by Random Forest & Logistic models' },
+          ].map(f => (
+            <div key={f.title} className="login-feature-card">
+              <span className="login-feature-icon">{f.icon}</span>
+              <div>
+                <div className="login-feature-title">{f.title}</div>
+                <div className="login-feature-desc">{f.desc}</div>
+              </div>
+            </div>
+          ))}
         </div>
+
       </div>
 
       {/* ── Right Panel ── */}

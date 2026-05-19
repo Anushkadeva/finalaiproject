@@ -1,31 +1,75 @@
-// src/pages/Analytics.jsx
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 
+const DOMAIN_CONFIG = {
+  'IT / Software': { color: '#ff6b35', bg: 'rgba(255,107,53,0.08)', icon: '💻' },
+  'Data & AI':     { color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)', icon: '🤖' },
+  'Design':        { color: '#14b8a6', bg: 'rgba(20,184,166,0.08)', icon: '🎨' },
+  'Marketing':     { color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', icon: '📣' },
+};
+
+const SKILL_LABELS = {
+  comm: 'Communication', aptitude: 'Aptitude', ps: 'Problem Solving',
+  teamwork: 'Teamwork', adapt: 'Adaptability', prog: 'Programming',
+  dsa: 'DSA', webdev: 'Web Dev', sql: 'SQL', ml: 'Machine Learning',
+  da: 'Data Analysis', cloud: 'Cloud/DevOps', cyber: 'Cybersecurity',
+  dm: 'Digital Marketing', seo: 'SEO', content: 'Content Writing',
+  social: 'Social Media', uiux: 'UI/UX Design', graphic: 'Graphic Design',
+  video: 'Video Editing', creativity: 'Creativity',
+};
+
+function KpiCard({ icon, label, value, sub, color, bg }) {
+  return (
+    <div style={{
+      background: '#fff', borderRadius: 16, padding: '1.5rem',
+      boxShadow: '0 2px 16px rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.06)',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+        background: `linear-gradient(90deg, ${color}, ${color}99)`,
+        borderRadius: '16px 16px 0 0',
+      }} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', color: '#9999bb', marginBottom: 8 }}>{label}</div>
+          <div style={{ fontSize: 32, fontWeight: 800, color, lineHeight: 1, marginBottom: 4 }}>{value}</div>
+          {sub && <div style={{ fontSize: 12, color: '#9999bb', marginTop: 4 }}>{sub}</div>}
+        </div>
+        <div style={{ width: 48, height: 48, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnimatedBar({ pct, color, height = 8 }) {
+  return (
+    <div style={{ height, background: '#f2ede8', borderRadius: 99, overflow: 'hidden' }}>
+      <div style={{
+        height: '100%', width: `${Math.min(pct, 100)}%`, background: color,
+        borderRadius: 99, transition: 'width 0.8s cubic-bezier(0.4,0,0.2,1)',
+      }} />
+    </div>
+  );
+}
+
 export default function Analytics() {
   const [analytics, setAnalytics] = useState({
-    domainDistribution: {},
-    readinessTrends: [],
-    skillGaps: [],
-    topSkills: [],
-    placementPredictions: {}
+    domainDistribution: {}, readinessTrends: [],
+    skillGaps: [], topSkills: [], placementPredictions: {}
   });
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, []);
+  useEffect(() => { fetchAnalytics(); }, []);
 
   const fetchAnalytics = async () => {
     try {
-      const [studentsRes, analysesRes, predictionsRes] = await Promise.all([
-        api.get('/students'),
-        api.get('/analysis/results'),
-        api.get('/ml/predictions')
+      const [students, analyses] = await Promise.all([
+        api.getStudents(),
+        fetch('http://localhost:5000/api/analysis/results').then(r => r.json()).catch(() => []),
       ]);
-
-      const students = studentsRes;
-      const analyses = analysesRes;
-      const predictions = predictionsRes;
 
       // Domain distribution
       const domainCounts = {};
@@ -33,392 +77,269 @@ export default function Analytics() {
         domainCounts[a.best_domain] = (domainCounts[a.best_domain] || 0) + 1;
       });
 
-      // Readiness trends
-      const readinessByMonth = {};
+      // Readiness trends by month
+      const byMonth = {};
       analyses.forEach(a => {
         const month = new Date(a.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
-        if (!readinessByMonth[month]) {
-          readinessByMonth[month] = [];
-        }
-        readinessByMonth[month].push(a.readiness_pct);
+        if (!byMonth[month]) byMonth[month] = [];
+        byMonth[month].push(a.readiness_pct);
       });
-
-      const trends = Object.keys(readinessByMonth).map(month => ({
+      const trends = Object.entries(byMonth).map(([month, scores]) => ({
         month,
-        average: readinessByMonth[month].reduce((sum, score) => sum + score, 0) / readinessByMonth[month].length,
-        count: readinessByMonth[month].length
+        average: scores.reduce((s, v) => s + v, 0) / scores.length,
+        count: scores.length,
       }));
 
-      // Skill gaps analysis
-      const skillGaps = [];
+      // Skill scores
       const skillScores = {};
-      
       students.forEach(student => {
-        Object.keys(student).forEach(key => {
-          if (key.includes('_rating') && typeof student[key] === 'number') {
-            const skillName = key.replace('_rating', '');
-            if (!skillScores[skillName]) {
-              skillScores[skillName] = [];
-            }
-            skillScores[skillName].push(student[key]);
+        Object.entries(student).forEach(([key, val]) => {
+          if (key.includes('_rating') && typeof val === 'number') {
+            const sk = key.replace('_rating', '');
+            if (!skillScores[sk]) skillScores[sk] = [];
+            skillScores[sk].push(val);
           }
         });
       });
 
-      Object.keys(skillScores).forEach(skill => {
-        const scores = skillScores[skill];
-        const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-        if (average < 3) {
-          skillGaps.push({
-            skill,
-            average: average.toFixed(1),
-            studentsBelow3: scores.filter(s => s < 3).length
-          });
-        }
-      });
-
-      // Top skills
-      const topSkills = Object.keys(skillScores)
-        .map(skill => ({
+      const skillGaps = Object.entries(skillScores)
+        .map(([skill, scores]) => ({
           skill,
-          average: skillScores[skill].reduce((sum, score) => sum + score, 0) / skillScores[skill].length
+          average: scores.reduce((s, v) => s + v, 0) / scores.length,
+          studentsBelow3: scores.filter(s => s < 3).length,
+        }))
+        .filter(s => s.average < 3)
+        .sort((a, b) => a.average - b.average)
+        .slice(0, 6);
+
+      const topSkills = Object.entries(skillScores)
+        .map(([skill, scores]) => ({
+          skill,
+          average: scores.reduce((s, v) => s + v, 0) / scores.length,
         }))
         .sort((a, b) => b.average - a.average)
-        .slice(0, 10);
+        .slice(0, 8);
 
-      setAnalytics({
-        domainDistribution: domainCounts,
-        readinessTrends: trends,
-        skillGaps: skillGaps.slice(0, 5),
-        topSkills,
-        placementPredictions: predictions
-      });
-    } catch (error) {
-      console.error('Error fetching analytics:', error);
+      setAnalytics({ domainDistribution: domainCounts, readinessTrends: trends, skillGaps, topSkills });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const totalStudents = Object.values(analytics.domainDistribution).reduce((s, v) => s + v, 0);
+  const maxDomain = Math.max(...Object.values(analytics.domainDistribution), 1);
+  const avgReadiness = analytics.readinessTrends.length
+    ? (analytics.readinessTrends.reduce((s, t) => s + t.average, 0) / analytics.readinessTrends.length).toFixed(1)
+    : '—';
+  const maxTrend = Math.max(...analytics.readinessTrends.map(t => t.average), 1);
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', flexDirection: 'column', gap: 16 }}>
+      <div className="spinner" style={{ width: 40, height: 40, borderWidth: 3 }} />
+      <div style={{ color: 'var(--text3)', fontSize: 14 }}>Loading analytics...</div>
+    </div>
+  );
+
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <h1>Analytics</h1>
-        <p>Comprehensive analytics and insights for the placement system</p>
+    <div style={{ maxWidth: 1200 }}>
+
+      {/* Header */}
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+          <div style={{ width: 4, height: 28, background: 'var(--orange)', borderRadius: 99 }} />
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>Analytics</h1>
+          <span style={{ background: 'var(--orange-dim)', color: 'var(--orange)', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, border: '1px solid var(--orange-border)' }}>LIVE</span>
+        </div>
+        <p style={{ fontSize: 14, color: 'var(--text2)', marginLeft: 16 }}>Comprehensive insights and placement analytics</p>
       </div>
 
-      <div className="analytics-grid">
-        <div className="analytics-section">
-          <h2>Domain Distribution</h2>
-          <div className="domain-cards">
-            {Object.entries(analytics.domainDistribution).map(([domain, count]) => (
-              <div key={domain} className="domain-card">
-                <h3>{domain}</h3>
-                <div className="domain-count">{count} students</div>
-                <div className="domain-bar">
-                  <div 
-                    className="domain-fill" 
-                    style={{ 
-                      width: `${(count / Math.max(...Object.values(analytics.domainDistribution))) * 100}%` 
-                    }}
-                  ></div>
-                </div>
-              </div>
-            ))}
+      {/* KPI Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: '2rem' }}>
+        <KpiCard icon="👥" label="Total Analyzed" value={totalStudents || '—'} sub="students in system" color="#ff6b35" bg="rgba(255,107,53,0.08)" />
+        <KpiCard icon="📊" label="Avg Readiness" value={avgReadiness !== '—' ? `${avgReadiness}%` : '—'} sub="across all analyses" color="#8b5cf6" bg="rgba(139,92,246,0.08)" />
+        <KpiCard icon="⚠️" label="Skill Gaps" value={analytics.skillGaps.length} sub="skills below avg 3/5" color="#ef4444" bg="rgba(239,68,68,0.08)" />
+        <KpiCard icon="🏆" label="Top Skills" value={analytics.topSkills.length} sub="skills tracked" color="#14b8a6" bg="rgba(20,184,166,0.08)" />
+      </div>
+
+      {/* Row 1: Domain Distribution + Readiness Trends */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+
+        {/* Domain Distribution */}
+        <div className="card" style={{ margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+            <div>
+              <div className="card-title" style={{ marginBottom: 2 }}>Domain Distribution</div>
+              <div style={{ fontSize: 12, color: 'var(--text3)' }}>{totalStudents} students across {Object.keys(analytics.domainDistribution).length} domains</div>
+            </div>
+            <span style={{ fontSize: 22 }}>🎯</span>
           </div>
+
+          {Object.keys(analytics.domainDistribution).length === 0 ? (
+            <div className="empty-state"><div className="empty-icon">📊</div>No data yet</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {Object.entries(analytics.domainDistribution)
+                .sort((a, b) => b[1] - a[1])
+                .map(([domain, count]) => {
+                  const cfg = DOMAIN_CONFIG[domain] || { color: '#ff6b35', bg: 'rgba(255,107,53,0.08)', icon: '📌' };
+                  const pct = Math.round((count / maxDomain) * 100);
+                  return (
+                    <div key={domain} style={{ background: cfg.bg, borderRadius: 12, padding: '14px 16px', border: `1px solid ${cfg.color}22` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 18 }}>{cfg.icon}</span>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{domain}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text3)' }}>{count} students</div>
+                          </div>
+                        </div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 800, color: cfg.color }}>{Math.round((count / totalStudents) * 100)}%</div>
+                      </div>
+                      <AnimatedBar pct={pct} color={cfg.color} height={6} />
+                    </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
 
-        <div className="analytics-section">
-          <h2>Readiness Trends</h2>
-          <div className="trend-chart">
-            {analytics.readinessTrends.map((trend, index) => (
-              <div key={trend.month} className="trend-item">
-                <div className="trend-month">{trend.month}</div>
-                <div className="trend-bar">
-                  <div 
-                    className="trend-fill" 
-                    style={{ 
-                      height: `${trend.average}%`,
-                      backgroundColor: trend.average >= 70 ? '#10b981' : trend.average >= 50 ? '#3b82f6' : '#f59e0b'
-                    }}
-                  ></div>
-                </div>
-                <div className="trend-value">{trend.average.toFixed(1)}%</div>
-              </div>
-            ))}
+        {/* Readiness Trends */}
+        <div className="card" style={{ margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+            <div>
+              <div className="card-title" style={{ marginBottom: 2 }}>Readiness Trends</div>
+              <div style={{ fontSize: 12, color: 'var(--text3)' }}>Monthly average readiness scores</div>
+            </div>
+            <span style={{ fontSize: 22 }}>📈</span>
           </div>
-        </div>
 
-        <div className="analytics-section">
-          <h2>Top Skills</h2>
-          <div className="skills-list">
-            {analytics.topSkills.map((skill, index) => (
-              <div key={skill.skill} className="skill-item">
-                <div className="skill-rank">#{index + 1}</div>
-                <div className="skill-info">
-                  <div className="skill-name">{skill.skill.replace(/_/g, ' ').toUpperCase()}</div>
-                  <div className="skill-average">{skill.average.toFixed(1)}/5.0</div>
-                </div>
-                <div className="skill-bar">
-                  <div 
-                    className="skill-fill" 
-                    style={{ 
-                      width: `${(skill.average / 5) * 100}%`,
-                      backgroundColor: skill.average >= 4 ? '#10b981' : skill.average >= 3 ? '#3b82f6' : '#f59e0b'
-                    }}
-                  ></div>
-                </div>
+          {analytics.readinessTrends.length === 0 ? (
+            <div className="empty-state"><div className="empty-icon">📈</div>No trend data yet</div>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 180, padding: '0 8px', marginBottom: 12 }}>
+                {analytics.readinessTrends.map((trend) => {
+                  const barH = Math.max((trend.average / maxTrend) * 140, 8);
+                  const color = trend.average >= 70 ? '#22c55e' : trend.average >= 50 ? '#ff6b35' : '#ef4444';
+                  return (
+                    <div key={trend.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color, fontFamily: 'var(--mono)' }}>{trend.average.toFixed(0)}%</div>
+                      <div style={{
+                        width: '100%', maxWidth: 36, height: barH, background: color,
+                        borderRadius: '6px 6px 0 0', opacity: 0.85,
+                        boxShadow: `0 4px 12px ${color}44`,
+                        transition: 'height 0.6s ease',
+                      }} />
+                      <div style={{ fontSize: 9, color: 'var(--text3)', textAlign: 'center', lineHeight: 1.2 }}>{trend.month}</div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="analytics-section">
-          <h2>Skill Gaps</h2>
-          <div className="gaps-list">
-            {analytics.skillGaps.map((gap, index) => (
-              <div key={gap.skill} className="gap-item">
-                <div className="gap-icon">⚠️</div>
-                <div className="gap-info">
-                  <div className="gap-skill">{gap.skill.replace(/_/g, ' ').toUpperCase()}</div>
-                  <div className="gap-stats">
-                    <span>Avg: {gap.average}/5.0</span>
-                    <span>{gap.studentsBelow3} students below 3.0</span>
+              <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+                {[['#22c55e', '≥70% Ready'], ['#ff6b35', '50–70%'], ['#ef4444', '<50%']].map(([c, l]) => (
+                  <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text3)' }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 3, background: c }} />{l}
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
-      <style jsx>{`
-        .page-container {
-          padding: 2rem;
-          max-width: 1400px;
-          margin: 0 auto;
-        }
+      {/* Row 2: Top Skills + Skill Gaps */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
 
-        .page-header {
-          margin-bottom: 2rem;
-        }
+        {/* Top Skills */}
+        <div className="card" style={{ margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+            <div>
+              <div className="card-title" style={{ marginBottom: 2 }}>Top Skills</div>
+              <div style={{ fontSize: 12, color: 'var(--text3)' }}>Highest rated skills across students</div>
+            </div>
+            <span style={{ fontSize: 22 }}>⭐</span>
+          </div>
 
-        .page-header h1 {
-          font-size: 2rem;
-          font-weight: 700;
-          color: #1f2937;
-          margin-bottom: 0.5rem;
-        }
+          {analytics.topSkills.length === 0 ? (
+            <div className="empty-state"><div className="empty-icon">⭐</div>No skill data yet</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {analytics.topSkills.map((skill, i) => {
+                const label = SKILL_LABELS[skill.skill] || skill.skill.replace(/_/g, ' ');
+                const pct = (skill.average / 5) * 100;
+                const color = skill.average >= 4 ? '#22c55e' : skill.average >= 3 ? '#ff6b35' : '#f59e0b';
+                const rankColors = ['#ff6b35', '#8b5cf6', '#14b8a6', '#f59e0b', '#22c55e'];
+                return (
+                  <div key={skill.skill} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--bg3)', borderRadius: 10 }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 8, background: rankColors[i % rankColors.length],
+                      color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 11, fontWeight: 800, flexShrink: 0,
+                    }}>#{i + 1}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', textTransform: 'capitalize' }}>{label}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color, fontFamily: 'var(--mono)' }}>{skill.average.toFixed(1)}/5</span>
+                      </div>
+                      <AnimatedBar pct={pct} color={color} height={5} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-        .page-header p {
-          color: #6b7280;
-          font-size: 1.1rem;
-        }
+        {/* Skill Gaps */}
+        <div className="card" style={{ margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+            <div>
+              <div className="card-title" style={{ marginBottom: 2 }}>Skill Gaps</div>
+              <div style={{ fontSize: 12, color: 'var(--text3)' }}>Skills needing improvement (avg &lt; 3/5)</div>
+            </div>
+            <span style={{ fontSize: 22 }}>⚠️</span>
+          </div>
 
-        .analytics-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 2rem;
-        }
-
-        .analytics-section {
-          background: white;
-          border-radius: 12px;
-          padding: 1.5rem;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        .analytics-section h2 {
-          font-size: 1.25rem;
-          font-weight: 600;
-          color: #1f2937;
-          margin-bottom: 1.5rem;
-        }
-
-        .domain-cards {
-          display: grid;
-          gap: 1rem;
-        }
-
-        .domain-card {
-          padding: 1rem;
-          background: #f9fafb;
-          border-radius: 8px;
-          border: 1px solid #e5e7eb;
-        }
-
-        .domain-card h3 {
-          font-size: 1rem;
-          font-weight: 600;
-          color: #1f2937;
-          margin-bottom: 0.5rem;
-        }
-
-        .domain-count {
-          font-size: 0.875rem;
-          color: #6b7280;
-          margin-bottom: 0.75rem;
-        }
-
-        .domain-bar {
-          width: 100%;
-          height: 8px;
-          background: #e5e7eb;
-          border-radius: 4px;
-          overflow: hidden;
-        }
-
-        .domain-fill {
-          height: 100%;
-          background: #3b82f6;
-          transition: width 0.3s ease;
-        }
-
-        .trend-chart {
-          display: flex;
-          gap: 1rem;
-          align-items: flex-end;
-          height: 200px;
-          padding: 1rem 0;
-        }
-
-        .trend-item {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .trend-month {
-          font-size: 0.75rem;
-          color: #6b7280;
-        }
-
-        .trend-bar {
-          width: 20px;
-          height: 100px;
-          background: #e5e7eb;
-          border-radius: 4px;
-          overflow: hidden;
-        }
-
-        .trend-fill {
-          width: 100%;
-          transition: height 0.3s ease;
-        }
-
-        .trend-value {
-          font-size: 0.75rem;
-          font-weight: 600;
-          color: #1f2937;
-        }
-
-        .skills-list {
-          display: flex;
-          flex-direction: column;
-          gap: 0.75rem;
-        }
-
-        .skill-item {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          padding: 0.75rem;
-          background: #f9fafb;
-          border-radius: 8px;
-        }
-
-        .skill-rank {
-          width: 30px;
-          height: 30px;
-          background: #3b82f6;
-          color: white;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 0.75rem;
-          font-weight: 600;
-        }
-
-        .skill-info {
-          flex: 1;
-        }
-
-        .skill-name {
-          font-weight: 600;
-          color: #1f2937;
-          font-size: 0.875rem;
-        }
-
-        .skill-average {
-          color: #6b7280;
-          font-size: 0.75rem;
-        }
-
-        .skill-bar {
-          width: 60px;
-          height: 8px;
-          background: #e5e7eb;
-          border-radius: 4px;
-          overflow: hidden;
-        }
-
-        .skill-fill {
-          height: 100%;
-          transition: width 0.3s ease;
-        }
-
-        .gaps-list {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .gap-item {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          padding: 1rem;
-          background: #fef2f2;
-          border: 1px solid #fecaca;
-          border-radius: 8px;
-        }
-
-        .gap-icon {
-          font-size: 1.5rem;
-        }
-
-        .gap-info {
-          flex: 1;
-        }
-
-        .gap-skill {
-          font-weight: 600;
-          color: #1f2937;
-          margin-bottom: 0.25rem;
-        }
-
-        .gap-stats {
-          display: flex;
-          gap: 1rem;
-          font-size: 0.875rem;
-          color: #6b7280;
-        }
-
-        @media (max-width: 768px) {
-          .page-container {
-            padding: 1rem;
-          }
-
-          .analytics-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .trend-chart {
-            overflow-x: auto;
-          }
-        }
-      `}</style>
+          {analytics.skillGaps.length === 0 ? (
+            <div className="empty-state" style={{ color: 'var(--success)' }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>✅</div>
+              No critical skill gaps found!
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {analytics.skillGaps.map((gap, i) => {
+                const label = SKILL_LABELS[gap.skill] || gap.skill.replace(/_/g, ' ');
+                const severity = gap.average < 1.5 ? 'Critical' : gap.average < 2 ? 'High' : 'Medium';
+                const sevColor = gap.average < 1.5 ? '#ef4444' : gap.average < 2 ? '#f59e0b' : '#ff6b35';
+                const pct = (gap.average / 5) * 100;
+                return (
+                  <div key={gap.skill} style={{
+                    padding: '12px 14px', borderRadius: 10,
+                    background: `${sevColor}08`, border: `1px solid ${sevColor}22`,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 14 }}>⚠️</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', textTransform: 'capitalize' }}>{label}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: `${sevColor}18`, color: sevColor }}>{severity}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: sevColor, fontFamily: 'var(--mono)' }}>{gap.average.toFixed(1)}/5</span>
+                      </div>
+                    </div>
+                    <AnimatedBar pct={pct} color={sevColor} height={5} />
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
+                      {gap.studentsBelow3} students rated below 3.0
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

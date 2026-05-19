@@ -490,7 +490,7 @@ tr:hover td { background: #fff8f5; }
 }
 
 .login-left {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  background: linear-gradient(135deg, #0f0c29 0%, #1a1a2e 40%, #16213e 70%, #0f3460 100%);
   padding: 3rem;
   display: flex;
   flex-direction: column;
@@ -511,17 +511,17 @@ tr:hover td { background: #fff8f5; }
 .login-brand-sub  { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
 
 .login-hero {
-  margin-top: auto;
-  margin-bottom: auto;
+  margin-top: 2rem;
+  margin-bottom: 1.5rem;
   z-index: 2;
   position: relative;
 }
 
 .login-hero-title {
-  font-size: 38px;
+  font-size: 42px;
   font-weight: 800;
   color: #fff;
-  line-height: 1.2;
+  line-height: 1.15;
   margin-bottom: 1rem;
 }
 
@@ -797,4 +797,65 @@ tr:hover td { background: #fff8f5; }
   color: var(--text2);
   line-height: 1.6;
   max-width: 480px;
+}
+
+/* ── Login Feature Cards ────────────────────────────────────────────────── */
+.login-features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  z-index: 2;
+  position: relative;
+  margin-top: auto;
+}
+
+.login-feature-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 14px 16px;
+  transition: all 0.2s;
+}
+
+.login-feature-card:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,107,53,0.4);
+  transform: translateY(-2px);
+}
+
+.login-feature-icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.login-feature-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 3px;
+}
+
+.login-feature-desc {
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.4;
+}
+
+/* Decorative grid lines on left panel */
+.login-left::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 1;
 }

@@ -1,523 +1,266 @@
-// src/pages/ExportReports.jsx
 import { useState, useEffect } from 'react';
-import { api } from '../services/api';
 
 export default function ExportReports() {
-  const [reports, setReports] = useState([]);
-  const [exportFormat, setExportFormat] = useState('csv');
+  const [reports,        setReports]        = useState([]);
+  const [exportFormat,   setExportFormat]   = useState('csv');
   const [selectedReport, setSelectedReport] = useState('all');
+  const [exporting,      setExporting]      = useState(false);
+  const [lastExport,     setLastExport]     = useState(null);
 
-  useEffect(() => {
-    fetchReports();
-  }, []);
+  useEffect(() => { fetchReports(); }, []);
 
   const fetchReports = async () => {
     try {
-      const response = await api.get('/analysis/results');
-      setReports(response);
-    } catch (error) {
-      console.error('Error fetching reports:', error);
-    }
+      const res = await fetch('http://localhost:5000/api/analysis/results');
+      const data = await res.json();
+      setReports(Array.isArray(data) ? data : []);
+    } catch (e) { console.error(e); }
+  };
+
+  const getFilteredData = () => {
+    if (selectedReport === 'ready')     return reports.filter(r => r.readiness_pct >= 60);
+    if (selectedReport === 'not-ready') return reports.filter(r => r.readiness_pct < 60);
+    return reports;
   };
 
   const exportData = () => {
-    let data = [];
-    let filename = '';
-    let contentType = '';
+    setExporting(true);
+    const data = getFilteredData();
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `placeai_${selectedReport}_${date}`;
 
-    switch (selectedReport) {
-      case 'all':
-        data = reports;
-        filename = `placement_reports_${new Date().toISOString().split('T')[0]}`;
-        break;
-      case 'ready':
-        data = reports.filter(r => r.readiness_pct >= 60);
-        filename = `ready_students_${new Date().toISOString().split('T')[0]}`;
-        break;
-      case 'not-ready':
-        data = reports.filter(r => r.readiness_pct < 60);
-        filename = `not_ready_students_${new Date().toISOString().split('T')[0]}`;
-        break;
-      default:
-        data = reports;
-        filename = 'placement_reports';
+    if (exportFormat === 'json') {
+      downloadFile(JSON.stringify(data, null, 2), `${filename}.json`, 'application/json');
+    } else {
+      const rows = [
+        ['Student ID', 'Best Domain', 'Readiness %', 'Status', 'Date'],
+        ...data.map(r => [
+          r.student_id, r.best_domain,
+          r.readiness_pct?.toFixed(1),
+          r.readiness_pct >= 60 ? 'Ready' : 'Not Ready',
+          new Date(r.created_at).toLocaleDateString(),
+        ]),
+      ].map(row => row.join(',')).join('\n');
+      downloadFile(rows, `${filename}.csv`, 'text/csv');
     }
 
-    if (exportFormat === 'csv') {
-      exportToCSV(data, filename);
-    } else if (exportFormat === 'json') {
-      exportToJSON(data, filename);
-    } else if (exportFormat === 'excel') {
-      exportToExcel(data, filename);
-    }
+    setLastExport(new Date().toLocaleString());
+    setTimeout(() => setExporting(false), 800);
   };
 
-  const exportToCSV = (data, filename) => {
-    const headers = ['Student ID', 'Best Domain', 'Readiness %', 'Created Date', 'Status'];
-    const csvContent = [
-      headers.join(','),
-      ...data.map(report => [
-        report.student_id,
-        report.best_domain,
-        report.readiness_pct.toFixed(1),
-        new Date(report.created_at).toLocaleDateString(),
-        report.readiness_pct >= 60 ? 'Ready' : 'Not Ready'
-      ].join(','))
-    ].join('\n');
-
-    downloadFile(csvContent, `${filename}.csv`, 'text/csv');
-  };
-
-  const exportToJSON = (data, filename) => {
-    const jsonContent = JSON.stringify(data, null, 2);
-    downloadFile(jsonContent, `${filename}.json`, 'application/json');
-  };
-
-  const exportToExcel = (data, filename) => {
-    // Simple Excel export (CSV format that Excel can open)
-    exportToCSV(data, filename);
-  };
-
-  const downloadFile = (content, filename, contentType) => {
-    const blob = new Blob([content], { type: contentType });
-    const url = window.URL.createObjectURL(blob);
+  const downloadFile = (content, filename, type) => {
     const a = document.createElement('a');
-    a.href = url;
+    a.href = URL.createObjectURL(new Blob([content], { type }));
     a.download = filename;
-    document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
   };
 
-  const getReportStats = () => {
-    const readyCount = reports.filter(r => r.readiness_pct >= 60).length;
-    const notReadyCount = reports.length - readyCount;
-    const avgReadiness = reports.length > 0 
-      ? reports.reduce((sum, r) => sum + r.readiness_pct, 0) / reports.length 
-      : 0;
-
-    return {
-      total: reports.length,
-      ready: readyCount,
-      notReady: notReadyCount,
-      average: avgReadiness.toFixed(1)
-    };
+  const stats = {
+    total:    reports.length,
+    ready:    reports.filter(r => r.readiness_pct >= 60).length,
+    notReady: reports.filter(r => r.readiness_pct < 60).length,
+    avg:      reports.length ? (reports.reduce((s, r) => s + r.readiness_pct, 0) / reports.length).toFixed(1) : '0',
   };
 
-  const stats = getReportStats();
+  const REPORT_TYPES = [
+    { value: 'all',       label: 'All Students',         icon: '👥', count: stats.total,    color: '#ff6b35' },
+    { value: 'ready',     label: 'Ready Students Only',  icon: '✅', count: stats.ready,    color: '#22c55e' },
+    { value: 'not-ready', label: 'Not Ready Students',   icon: '⚠️', count: stats.notReady, color: '#ef4444' },
+  ];
+
+  const FORMATS = [
+    { value: 'csv',  label: 'CSV',  icon: '📄', desc: 'Best for Excel & spreadsheets' },
+    { value: 'json', label: 'JSON', icon: '🔧', desc: 'Ideal for API integration' },
+  ];
+
+  const TIPS = [
+    { icon: '📄', title: 'CSV Format',       desc: 'Best for importing into Excel or Google Sheets' },
+    { icon: '🔧', title: 'JSON Format',      desc: 'Ideal for programmatic processing and APIs' },
+    { icon: '🔄', title: 'Regular Exports',  desc: 'Export regularly to maintain data backups' },
+    { icon: '🎯', title: 'Filter First',     desc: 'Use report type filters to export targeted data' },
+  ];
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <h1>Export Reports</h1>
-        <p>Export placement and analytics reports in various formats</p>
+    <div style={{ maxWidth: 1100 }}>
+
+      {/* Header */}
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <div style={{ width: 4, height: 26, background: 'var(--orange)', borderRadius: 99 }} />
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text)' }}>Export Reports</h1>
+        </div>
+        <p style={{ fontSize: 13, color: 'var(--text2)', marginLeft: 14 }}>Export placement and analytics data in various formats</p>
       </div>
 
-      <div className="export-controls">
-        <div className="control-section">
-          <h3>Export Options</h3>
-          <div className="controls-grid">
-            <div className="control-group">
-              <label>Report Type:</label>
-              <select 
-                value={selectedReport} 
-                onChange={(e) => setSelectedReport(e.target.value)}
-                className="control-select"
-              >
-                <option value="all">All Students</option>
-                <option value="ready">Ready Students Only</option>
-                <option value="not-ready">Not Ready Students Only</option>
-              </select>
-            </div>
-
-            <div className="control-group">
-              <label>Export Format:</label>
-              <select 
-                value={exportFormat} 
-                onChange={(e) => setExportFormat(e.target.value)}
-                className="control-select"
-              >
-                <option value="csv">CSV</option>
-                <option value="json">JSON</option>
-                <option value="excel">Excel</option>
-              </select>
-            </div>
-
-            <div className="control-group">
-              <label>&nbsp;</label>
-              <button className="btn btn-primary" onClick={exportData}>
-                📤 Export Now
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="stats-section">
-          <h3>Current Data Overview</h3>
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-icon">📊</div>
-              <div className="stat-content">
-                <div className="stat-label">Total Reports</div>
-                <div className="stat-value">{stats.total}</div>
+      {/* KPI Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: '2rem' }}>
+        {[
+          { label: 'Total Reports',    value: stats.total,    color: '#ff6b35', icon: '📊' },
+          { label: 'Ready Students',   value: stats.ready,    color: '#22c55e', icon: '✅' },
+          { label: 'Not Ready',        value: stats.notReady, color: '#ef4444', icon: '⚠️' },
+          { label: 'Avg Readiness',    value: `${stats.avg}%`, color: '#8b5cf6', icon: '📈' },
+        ].map(c => (
+          <div key={c.label} className="kpi-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div className="kpi-lbl">{c.label}</div>
+                <div className="kpi-val" style={{ color: c.color, fontSize: 26 }}>{c.value}</div>
               </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon">✅</div>
-              <div className="stat-content">
-                <div className="stat-label">Ready Students</div>
-                <div className="stat-value" style={{ color: '#10b981' }}>{stats.ready}</div>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon">⚠️</div>
-              <div className="stat-content">
-                <div className="stat-label">Not Ready</div>
-                <div className="stat-value" style={{ color: '#f59e0b' }}>{stats.notReady}</div>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon">📈</div>
-              <div className="stat-content">
-                <div className="stat-label">Average Readiness</div>
-                <div className="stat-value">{stats.average}%</div>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: `${c.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                {c.icon}
               </div>
             </div>
           </div>
-        </div>
+        ))}
       </div>
 
-      <div className="export-history">
-        <h3>Export History</h3>
-        <div className="history-list">
-          <div className="history-item">
-            <div className="history-info">
-              <div className="history-title">Full Report Export</div>
-              <div className="history-date">Last exported: Never</div>
-            </div>
-            <div className="history-actions">
-              <button className="btn btn-sm btn-outline">
-                🔄 Re-export
-              </button>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 20, marginBottom: 20 }}>
+
+        {/* Export Options */}
+        <div className="card" style={{ margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1.5rem' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--orange-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📤</div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>Export Options</div>
+              <div style={{ fontSize: 12, color: 'var(--text3)' }}>Choose what to export</div>
             </div>
           </div>
+
+          {/* Report Type Cards */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div className="section-label">Report Type</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {REPORT_TYPES.map(t => (
+                <div key={t.value}
+                  onClick={() => setSelectedReport(t.value)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px',
+                    borderRadius: 10, cursor: 'pointer', transition: 'all 0.2s',
+                    background: selectedReport === t.value ? `${t.color}10` : 'var(--bg3)',
+                    border: `1.5px solid ${selectedReport === t.value ? t.color + '40' : 'transparent'}`,
+                  }}>
+                  <span style={{ fontSize: 18 }}>{t.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: selectedReport === t.value ? t.color : 'var(--text)' }}>{t.label}</div>
+                  </div>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: t.color }}>{t.count}</span>
+                  {selectedReport === t.value && (
+                    <div style={{ width: 18, height: 18, borderRadius: '50%', background: t.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ color: '#fff', fontSize: 10, fontWeight: 800 }}>✓</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Format Cards */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div className="section-label">Export Format</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {FORMATS.map(f => (
+                <div key={f.value}
+                  onClick={() => setExportFormat(f.value)}
+                  style={{
+                    flex: 1, padding: '12px', borderRadius: 10, cursor: 'pointer',
+                    textAlign: 'center', transition: 'all 0.2s',
+                    background: exportFormat === f.value ? 'var(--orange-dim)' : 'var(--bg3)',
+                    border: `1.5px solid ${exportFormat === f.value ? 'var(--orange-border)' : 'transparent'}`,
+                  }}>
+                  <div style={{ fontSize: 22, marginBottom: 4 }}>{f.icon}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: exportFormat === f.value ? 'var(--orange)' : 'var(--text)' }}>{f.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{f.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Export Button */}
+          <button
+            className="btn btn-primary"
+            onClick={exportData}
+            disabled={exporting || reports.length === 0}
+            style={{ width: '100%', padding: '13px', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+          >
+            {exporting ? <><span className="spinner" style={{ borderTopColor: '#fff' }} /> Exporting...</> : `📤 Export ${getFilteredData().length} Records as ${exportFormat.toUpperCase()}`}
+          </button>
+
+          {lastExport && (
+            <div style={{ marginTop: 10, textAlign: 'center', fontSize: 12, color: 'var(--success)' }}>
+              ✓ Last exported: {lastExport}
+            </div>
+          )}
         </div>
-      </div>
 
-      <div className="export-tips">
-        <h3>Export Tips</h3>
-        <div className="tips-grid">
-          <div className="tip-card">
-            <div className="tip-icon">📄</div>
-            <div className="tip-content">
-              <h4>CSV Format</h4>
-              <p>Best for importing into Excel or other spreadsheet applications</p>
-            </div>
-          </div>
-
-          <div className="tip-card">
-            <div className="tip-icon">🔧</div>
-            <div className="tip-content">
-              <h4>JSON Format</h4>
-              <p>Ideal for programmatic processing and API integration</p>
-            </div>
-          </div>
-
-          <div className="tip-card">
-            <div className="tip-icon">📊</div>
-            <div className="tip-content">
-              <h4>Excel Format</h4>
-              <p>Directly opens in Microsoft Excel with proper formatting</p>
-            </div>
-          </div>
-
-          <div className="tip-card">
-            <div className="tip-icon">🔄</div>
-            <div className="tip-content">
-              <h4>Regular Exports</h4>
-              <p>Export regularly to maintain backup of placement data</p>
+        {/* Tips */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="card" style={{ margin: 0, flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', marginBottom: '1rem' }}>💡 Export Tips</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {TIPS.map(t => (
+                <div key={t.title} style={{ display: 'flex', gap: 12, padding: '10px 12px', background: 'var(--bg3)', borderRadius: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--orange-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+                    {t.icon}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{t.title}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>{t.desc}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
-      <style jsx>{`
-        .page-container {
-          padding: 2rem;
-          max-width: 1200px;
-          margin: 0 auto;
-        }
-
-        .page-header {
-          margin-bottom: 2rem;
-        }
-
-        .page-header h1 {
-          font-size: 2rem;
-          font-weight: 700;
-          color: #1f2937;
-          margin-bottom: 0.5rem;
-        }
-
-        .page-header p {
-          color: #6b7280;
-          font-size: 1.1rem;
-        }
-
-        .export-controls {
-          display: grid;
-          grid-template-columns: 2fr 1fr;
-          gap: 2rem;
-          margin-bottom: 3rem;
-        }
-
-        .control-section h3,
-        .stats-section h3 {
-          font-size: 1.25rem;
-          font-weight: 600;
-          color: #1f2937;
-          margin-bottom: 1.5rem;
-        }
-
-        .controls-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 1rem;
-        }
-
-        .control-group {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-        .control-group label {
-          font-weight: 600;
-          color: #374151;
-          font-size: 0.875rem;
-        }
-
-        .control-select {
-          padding: 0.75rem;
-          border: 1px solid #d1d5db;
-          border-radius: 8px;
-          font-size: 0.875rem;
-          background: white;
-        }
-
-        .btn {
-          padding: 0.75rem 1.5rem;
-          border: none;
-          border-radius: 8px;
-          font-size: 0.875rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-
-        .btn-primary {
-          background: #3b82f6;
-          color: white;
-        }
-
-        .btn-primary:hover {
-          background: #2563eb;
-        }
-
-        .btn-sm {
-          padding: 0.5rem 1rem;
-          font-size: 0.75rem;
-        }
-
-        .btn-outline {
-          background: white;
-          border: 1px solid #d1d5db;
-          color: #374151;
-        }
-
-        .btn-outline:hover {
-          background: #f9fafb;
-        }
-
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 1rem;
-        }
-
-        .stat-card {
-          background: white;
-          border-radius: 8px;
-          padding: 1.5rem;
-          box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-
-        .stat-icon {
-          font-size: 2rem;
-          width: 3rem;
-          height: 3rem;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #f3f4f6;
-          border-radius: 50%;
-        }
-
-        .stat-content {
-          flex: 1;
-        }
-
-        .stat-label {
-          font-size: 0.875rem;
-          color: #6b7280;
-          margin-bottom: 0.25rem;
-        }
-
-        .stat-value {
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: #1f2937;
-        }
-
-        .export-history {
-          background: white;
-          border-radius: 12px;
-          padding: 2rem;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-          margin-bottom: 2rem;
-        }
-
-        .export-history h3 {
-          font-size: 1.25rem;
-          font-weight: 600;
-          color: #1f2937;
-          margin-bottom: 1.5rem;
-        }
-
-        .history-list {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .history-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 1rem;
-          background: #f9fafb;
-          border-radius: 8px;
-          border: 1px solid #e5e7eb;
-        }
-
-        .history-info {
-          flex: 1;
-        }
-
-        .history-title {
-          font-weight: 600;
-          color: #1f2937;
-          font-size: 1rem;
-        }
-
-        .history-date {
-          font-size: 0.875rem;
-          color: #6b7280;
-          margin-top: 0.25rem;
-        }
-
-        .history-actions {
-          display: flex;
-          gap: 0.5rem;
-        }
-
-        .export-tips {
-          background: white;
-          border-radius: 12px;
-          padding: 2rem;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        .export-tips h3 {
-          font-size: 1.25rem;
-          font-weight: 600;
-          color: #1f2937;
-          margin-bottom: 1.5rem;
-        }
-
-        .tips-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          gap: 1.5rem;
-        }
-
-        .tip-card {
-          display: flex;
-          align-items: flex-start;
-          gap: 1rem;
-          padding: 1rem;
-          background: #f9fafb;
-          border-radius: 8px;
-          border: 1px solid #e5e7eb;
-        }
-
-        .tip-icon {
-          font-size: 1.5rem;
-          width: 2.5rem;
-          height: 2.5rem;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #e5e7eb;
-          border-radius: 50%;
-          flex-shrink: 0;
-        }
-
-        .tip-content h4 {
-          font-size: 1rem;
-          font-weight: 600;
-          color: #1f2937;
-          margin-bottom: 0.5rem;
-        }
-
-        .tip-content p {
-          font-size: 0.875rem;
-          color: #6b7280;
-          line-height: 1.5;
-          margin: 0;
-        }
-
-        @media (max-width: 768px) {
-          .page-container {
-            padding: 1rem;
-          }
-
-          .export-controls {
-            grid-template-columns: 1fr;
-          }
-
-          .stats-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .tips-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .history-item {
-            flex-direction: column;
-            gap: 1rem;
-            align-items: flex-start;
-          }
-        }
-      `}</style>
+      {/* Preview Table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+            Preview — {getFilteredData().length} records selected
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--text3)' }}>Showing first 5</span>
+        </div>
+        {getFilteredData().length === 0 ? (
+          <div className="empty-state"><div className="empty-icon">📋</div>No data to preview</div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Student ID</th>
+                  <th>Best Domain</th>
+                  <th>Readiness %</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getFilteredData().slice(0, 5).map(r => {
+                  const rc = r.readiness_pct >= 60 ? '#22c55e' : '#ef4444';
+                  return (
+                    <tr key={r.id}>
+                      <td style={{ fontFamily: 'var(--mono)', fontSize: 12 }}>#{r.student_id}</td>
+                      <td>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--orange)' }}>{r.best_domain}</span>
+                      </td>
+                      <td>
+                        <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: rc }}>{r.readiness_pct?.toFixed(1)}%</span>
+                      </td>
+                      <td>
+                        <span style={{ background: `${rc}15`, color: rc, padding: '2px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700 }}>
+                          {r.readiness_pct >= 60 ? 'Ready' : 'Not Ready'}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 12, color: 'var(--text3)' }}>{new Date(r.created_at).toLocaleDateString()}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
